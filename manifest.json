@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Garmin to ZWO Converter",
+  "version": "1.0.0",
+  "description": "Convert Garmin Connect workouts to ZWO format",
+  "permissions": [
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://connect.garmin.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://connect.garmin.com/app/workout/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

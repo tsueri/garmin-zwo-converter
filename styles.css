@@ -1,0 +1,37 @@
+/* Extension-specific styles */
+
+.garmin-zwo-button {
+  background-color: #11a9ed;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-left: 10px;
+  transition: background-color 0.2s ease;
+}
+
+.garmin-zwo-button:hover {
+  background-color: #0a8bc5;
+}
+
+.garmin-zwo-button:active {
+  opacity: 0.8;
+}
+
+.zwo-download-success {
+  animation: successFadeOut 2s ease-out;
+}
+
+@keyframes successFadeOut {
+  0% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
