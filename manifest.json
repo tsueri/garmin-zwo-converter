@@ -3,6 +3,7 @@
   "name": "Garmin to ZWO Converter",
   "version": "1.0.0",
   "description": "Convert Garmin Connect workouts to ZWO format. This extension does not collect any personal data.",
+  "id": "extension+garmin-zwo-converter@jonaszuercher.ch",
   "permissions": [
     "scripting",
     "activeTab"
