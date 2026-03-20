@@ -41,7 +41,4 @@ Works in Chrome, Edge, Brave, and other Chromium-based browsers. Firefox is not 
 2. Wait for the blue **"Download .zwo"** button to appear in the workout editor header.
 3. Click the button — a `.zwo` file named after your workout is downloaded.
 4. Place the file in your Zwift workouts folder:
-   `Documents/Zwift/Workouts/<your-id>/` ot use it anywhere else.
-
-A toast notification confirms the download or shows an error if extraction fails.
-
+   `Documents/Zwift/Workouts/<your-id>/` or use it anywhere else.
