@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Garmin to ZWO Converter",
+  "name": "Garmin-Connect to ZWO Converter",
   "version": "1.0.0",
   "description": "Convert Garmin Connect workouts to ZWO format.",
   "browser_specific_settings": {
