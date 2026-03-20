@@ -1,6 +1,9 @@
 # Garmin to ZWO Converter
 
-add
+Use your Workout from Garmin Connect anywhere else with the .zwo export functionaliry added by this extension. 
+
+## News
+The extension is now available in the Firefox Add-ons Library. 🥳
 
 ## Features
 
@@ -33,7 +36,7 @@ No build step required — the extension runs directly from source.
 3. Enable **Developer mode** (toggle in the top-right corner).
 4. Click **"Load unpacked"** and select the project folder.
 
-Works in Chrome, Edge, Brave, and other Chromium-based browsers. Firefox is not supported (MV3 format).
+Works in Chrome, Edge, Brave, and other Chromium-based browsers as well as in Browsers from from the Firefox-family.
 
 ## Usage
 
