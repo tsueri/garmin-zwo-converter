@@ -1,6 +1,6 @@
 # Garmin to ZWO Converter
 
-Use your Workout from Garmin Connect anywhere else with the .zwo export functionaliry added by this extension. 
+Use your Workout from Garmin Connect anywhere else with the .zwo export functionality added by this extension. 
 
 ## News
 The extension is now available in the [Firefox Add-ons Library](https://addons.mozilla.org/de/firefox/addon/garmin-to-zwo-converter/). 🥳
