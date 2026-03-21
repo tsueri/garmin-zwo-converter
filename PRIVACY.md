@@ -15,10 +15,9 @@ This extension operates entirely locally within your browser. When you use the e
 
 The extension requires the following permissions to function:
 
-- `host_permissions`: Access to `connect.garmin.com` to read workout data
-- `permissions`: Scripting and activeTab for UI injection
+- `host_permissions`: Access to `connect.garmin.com` to read workout data from the page and inject the download button
 
-These permissions are used solely to read workout data from the page and inject the download button. No data leaves your browser.
+No data leaves your browser.
 
 ## Contact
 

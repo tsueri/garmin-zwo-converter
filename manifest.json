@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Garmin-Connect to ZWO Converter",
-  "version": "1.0.0",
+  "version": "1.9.0",
   "description": "Convert Garmin Connect workouts to ZWO format.",
   "browser_specific_settings": {
     "gecko": {
       "id": "garmin-zwo-converter-extension@jonaszuercher.ch",
       "data_collection_permissions": {
-      "required": ["none"]
-    }
+        "required": ["none"]
+      }
     }
   },
   "host_permissions": [

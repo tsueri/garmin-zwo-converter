@@ -1,5 +1,5 @@
 /**
- * Garmin Connect -> ZWO Converter  v1.8
+ * Garmin Connect -> ZWO Converter  v1.9
  *
  * Selector strategy (zero hashed class names):
  *  - [data-step-id]            - every step and repeat wrapper
@@ -28,14 +28,22 @@ function parseTime(str) {
   return null;
 }
 
+function normalizeText(el) {
+  return el ? el.innerHTML.replace(/<br\s*\/?>/gi, ' ').replace(/\s+/g, ' ').trim() : '';
+}
+
 function fmtTime(sec) {
   if (sec == null) return '?:??';
-  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function parseZone(text) {
   if (!text) return null;
-  const m = text.match(/(?:Leistungsbereich|Zone|Z)\s*(\d+)/i);
+  const m = text.match(/(?:Leistungsbereich|Zone?|Z)\s*(\d+)/i);
   return m ? `Z${m[1]}` : null;
 }
 
@@ -44,7 +52,8 @@ function escXml(s) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 function cdata(s) {
@@ -72,9 +81,10 @@ function getPageContainer() {
   if (firstStep) {
     let el = firstStep.parentElement;
     while (el && el !== document.body) {
+      const cls = typeof el.className === 'string' ? el.className : '';
       if (el.id ||
-          el.className.includes('workoutPage') ||
-          el.className.includes('content')) {
+          cls.includes('workoutPage') ||
+          cls.includes('content')) {
         return el;
       }
       el = el.parentElement;
@@ -165,15 +175,19 @@ const DURATION_LABELS = [
   'gesamtzeit', 'duration', 'dauer', 'time', 'zeit'
 ];
 const INTENSITY_LABELS = [
-  'intensitätsziel', 'intensity', 'intensitet',
-  'zone', 'power', 'leistung', 'pace', 'tempo',
-  'heart rate', 'herzfrequenz'
+  'intensitätsziel', 'intensity', 'intensitet', 'primäres ziel',
+  'zone', 'power', 'leistung', 'pace', 'tempo'
+];
+const CADENCE_LABELS = [
+  'rpm', 'cadence', 'kadenz', 'trittfrequenz', 'pedalstrokes'
 ];
 
 function readStepFields(stepEl) {
   let duration    = null;
   let zone        = null;
   let isOpenEnded = false;
+  let cadenceLow  = null;
+  let cadenceHigh = null;
 
   for (const div of stepEl.querySelectorAll('div')) {
     const kids = Array.from(div.children).filter(c => c.tagName === 'DIV');
@@ -187,20 +201,53 @@ function readStepFields(stepEl) {
 
     if (DURATION_LABELS.some(l => labelText.includes(l))) {
       const raw = dataWrapper.textContent.trim();
+      console.log('[GarminZWO] Duration found:', { labelText, raw });
       if (/lap|taste|button|press/i.test(raw)) {
         isOpenEnded = true;
-        duration    = null;
+        duration = null;
       } else {
         duration = parseTime(raw);
       }
     }
 
     if (INTENSITY_LABELS.some(l => labelText.includes(l))) {
-      zone = parseZone(dataWrapper.textContent.trim());
+      const dataText = normalizeText(dataWrapper);
+      console.log('[GarminZWO] Primary target found:', { labelText, dataText });
+      const z = parseZone(dataText);
+      if (z && zone == null) {
+        zone = z;
+        console.log('[GarminZWO] Zone detected:', zone);
+      }
+      
+      if (cadenceLow == null) {
+        const match = dataText.match(/(\d+)\s*[-–]\s*(\d+)\s*(?:rpm|cadence|kadenz|trittfrequenz)/i)
+                   ?? dataText.match(/(\d+)\s*(?:rpm|cadence|kadenz|trittfrequenz)/i);
+        if (match) {
+          cadenceLow = parseInt(match[1], 10);
+          cadenceHigh = match[2] ? parseInt(match[2], 10) : cadenceLow;
+          console.log('[GarminZWO] Cadence from primary:', { cadenceLow, cadenceHigh });
+        }
+      }
     }
   }
 
-  return { duration, zone, isOpenEnded };
+  if (cadenceLow == null) {
+    const allDataDivs = stepEl.querySelectorAll('[class*="StepDataField_data"]');
+    for (const dataDiv of allDataDivs) {
+      const text = normalizeText(dataDiv);
+      const match = text.match(/(\d+)\s*[-–]\s*(\d+)\s*(?:rpm|cadence|kadenz)/i)
+                 ?? text.match(/(\d+)\s*(?:rpm|cadence|kadenz)/i);
+      if (match) {
+        cadenceLow = parseInt(match[1], 10);
+        cadenceHigh = match[2] ? parseInt(match[2], 10) : cadenceLow;
+        console.log('[GarminZWO] Cadence from fallback:', { cadenceLow, cadenceHigh, text });
+        break;
+      }
+    }
+  }
+
+  console.log('[GarminZWO] readStepFields result:', { duration, zone, isOpenEnded, cadenceLow, cadenceHigh });
+  return { duration, zone, isOpenEnded, cadenceLow, cadenceHigh };
 }
 
 // -----------------------------------------------------------------------------
@@ -233,8 +280,8 @@ function parseNode(el) {
   }
 
   const title = readStepTitle(el);
-  const { duration, zone, isOpenEnded } = readStepFields(el);
-  return { kind: 'step', title, duration, zone, isOpenEnded };
+  const { duration, zone, isOpenEnded, cadenceLow, cadenceHigh } = readStepFields(el);
+  return { kind: 'step', title, duration, zone, isOpenEnded, cadenceLow, cadenceHigh };
 }
 
 function findStepsContainer(root) {
@@ -284,6 +331,12 @@ function nodeToZwoLines(node, indent) {
     if (children.length === 2) {
       const on  = children[0];
       const off = children[1];
+      const hasCadence = on.cadenceLow != null || off.cadenceLow != null;
+      const cadLow  = on.cadenceLow  ?? off.cadenceLow  ?? '';
+      const cadHigh = on.cadenceHigh ?? off.cadenceHigh ?? '';
+      const cadenceAttrs = hasCadence
+        ? ` CadenceLow="${cadLow}" CadenceHigh="${cadHigh}"`
+        : '';
       lines.push(
         `${indent}<!-- ${safeComment(`Repeat ${count}x: [${on.title || 'on'}] / [${off.title || 'off'}]`)} -->`,
         `${indent}<IntervalsT` +
@@ -291,7 +344,7 @@ function nodeToZwoLines(node, indent) {
           ` OnDuration="${resolvedDuration(on, 30)}"` +
           ` OffDuration="${resolvedDuration(off, 120)}"` +
           ` OnPower="${zoneToPower(on.zone).toFixed(2)}"` +
-          ` OffPower="${zoneToPower(off.zone).toFixed(2)}"/>`
+          ` OffPower="${zoneToPower(off.zone).toFixed(2)}"${cadenceAttrs}/>`
       );
     } else {
       lines.push(
@@ -313,25 +366,30 @@ function nodeToZwoLines(node, indent) {
     const dur   = node.duration;
     const zone  = node.zone;
     const power = zoneToPower(zone);
+    const hasCadence = node.cadenceLow != null;
+    const cadenceAttrs = hasCadence
+      ? ` CadenceLow="${node.cadenceLow}" CadenceHigh="${node.cadenceHigh}"`
+      : '';
     const label = safeComment(
       `${node.title || 'Step'} \u2013 ${fmtTime(dur)} @ ${zone ?? 'no zone'}`
     );
 
-    if (node.isOpenEnded || zone == null) {
-      const freeDur = node.isOpenEnded ? 120 : (dur ?? 120);
-      const suffix  = node.isOpenEnded
-        ? ' (open ended lap button)'
-        : ' (no intensity zone)';
+    if (node.isOpenEnded) {
       lines.push(
-        `${indent}<!-- ${label}${suffix} -->`,
-        `${indent}<FreeRide Duration="${freeDur}" FlatRoad="1"/>`
+        `${indent}<!-- ${label} (open ended lap button) -->`,
+        `${indent}<FreeRide Duration="120" FlatRoad="1"${cadenceAttrs}/>`
       );
     } else if (dur == null) {
       lines.push(`${indent}<!-- SKIPPED: ${label} (no duration) -->`);
-    } else {
+    } else if (zone != null) {
       lines.push(
         `${indent}<!-- ${label} -->`,
-        `${indent}<SteadyState Duration="${dur}" Power="${power.toFixed(2)}"/>`
+        `${indent}<SteadyState Duration="${dur}" Power="${power.toFixed(2)}"${cadenceAttrs}/>`
+      );
+    } else {
+      lines.push(
+        `${indent}<!-- ${label} (no intensity zone) -->`,
+        `${indent}<FreeRide Duration="${dur}" FlatRoad="1"${cadenceAttrs}/>`
       );
     }
   }
@@ -398,7 +456,7 @@ function downloadZwo(data) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
   return filename;
 }
 
@@ -473,22 +531,6 @@ function createZwoButton() {
   btn.id          = 'garmin-zwo-btn';
   btn.textContent = 'Download .zwo';
   btn.title       = 'Download as Zwift ZWO file';
-  Object.assign(btn.style, {
-    marginLeft:   '8px',
-    padding:      '8px 16px',
-    background:   '#11a9ed',
-    color:        '#fff',
-    border:       'none',
-    borderRadius: '4px',
-    cursor:       'pointer',
-    fontWeight:   '600',
-    fontSize:     '14px',
-    fontFamily:   'inherit',
-    lineHeight:   '1.4',
-    transition:   'background .2s',
-  });
-  btn.addEventListener('mouseenter', () => { btn.style.background = '#0d8bbf'; });
-  btn.addEventListener('mouseleave', () => { btn.style.background = '#11a9ed'; });
   btn.addEventListener('click', () => {
     try {
       const data = extractWorkout();
@@ -554,6 +596,8 @@ function injectButton() {
 
 let observerActive   = false;
 let lastInjectedPath = '';
+let currentObserver  = null;
+let pendingRaf       = 0;
 
 function tryActivate() {
   if (!isWorkoutPageReady()) return false;
@@ -567,22 +611,38 @@ function startObserver() {
   observerActive = true;
 
   const observer = new MutationObserver(() => {
-    const btn = document.getElementById('garmin-zwo-btn');
+    // Debounce: coalesce rapid DOM mutations into one check per frame
+    if (pendingRaf) return;
+    pendingRaf = requestAnimationFrame(() => {
+      pendingRaf = 0;
 
-    // Page navigated to a new workout — remove stale button and re-inject
-    if (btn && location.pathname !== lastInjectedPath) {
-      document.getElementById('garmin-zwo-btn-wrapper')?.remove();
-      btn.remove();
-      lastInjectedPath = '';
-    }
+      // Not on a workout page — disconnect to avoid wasted cycles in SPA
+      if (!location.pathname.includes('/workout/')) {
+        observer.disconnect();
+        observerActive = false;
+        currentObserver = null;
+        console.log('[GarminZWO] Observer disconnected (left workout page).');
+        return;
+      }
 
-    // Button missing and page is ready — inject
-    if (!document.getElementById('garmin-zwo-btn') && isWorkoutPageReady()) {
-      injectButton();
-      lastInjectedPath = location.pathname;
-    }
+      const btn = document.getElementById('garmin-zwo-btn');
+
+      // Page navigated to a new workout — remove stale button and re-inject
+      if (btn && location.pathname !== lastInjectedPath) {
+        document.getElementById('garmin-zwo-btn-wrapper')?.remove();
+        btn.remove();
+        lastInjectedPath = '';
+      }
+
+      // Button missing and page is ready — inject
+      if (!document.getElementById('garmin-zwo-btn') && isWorkoutPageReady()) {
+        injectButton();
+        lastInjectedPath = location.pathname;
+      }
+    });
   });
 
+  currentObserver = observer;
   observer.observe(document.body, { childList: true, subtree: true });
   console.log('[GarminZWO] MutationObserver active.');
 }
