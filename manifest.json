@@ -11,9 +11,6 @@
     }
     }
   },
-  "permissions": [
-    "activeTab"
-  ],
   "host_permissions": [
     "*://connect.garmin.com/*"
   ],
